@@ -1,233 +1,537 @@
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fauziah Tomyam - Live System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .active-tab { color: #dc2626; border-bottom: 3px solid #dc2626; }
-        .order-card { animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    </style>
-</head>
-<body class="bg-gray-50">
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  addDoc, 
+  onSnapshot, 
+  updateDoc, 
+  query, 
+  serverTimestamp,
+  signInAnonymously,
+  getAuth,
+  onAuthStateChanged
+} from 'firebase/firestore';
+import { 
+  Utensils, 
+  ShoppingBag, 
+  Clock, 
+  CheckCircle2, 
+  ChevronRight, 
+  ChefHat, 
+  Smartphone,
+  Plus,
+  Minus,
+  Trash2,
+  X
+} from 'lucide-react';
 
-    <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl relative">
-        <div class="flex items-center justify-center h-screen">
-            <div class="text-center">
-                <i class="fas fa-circle-notch fa-spin text-3xl text-red-600 mb-4"></i>
-                <p class="text-gray-500 font-bold">Connecting to Kitchen...</p>
-            </div>
+// --- CONFIGURATION ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'fauziah-tomyam-qr';
+
+// --- MENU DATA (Extracted from image) ---
+const MENU_DATA = {
+  "Masakan (Thai)": [
+    { id: 'm1', name: 'Masak Merah', prices: { ayam: 7.0, daging: 7.0, seafood: 8.0, udang: 8.0, sotong: 8.0 }, hasVariants: true },
+    { id: 'm2', name: 'Masak Pedas', prices: { ayam: 7.0, daging: 7.0, seafood: 8.0, udang: 8.0, sotong: 8.0 }, hasVariants: true },
+    { id: 'm3', name: 'Masak Paprik', prices: { ayam: 7.0, daging: 7.0, seafood: 8.0, udang: 8.0, sotong: 8.0 }, hasVariants: true },
+    { id: 'm4', name: 'Black Pepper', prices: { ayam: 7.0, daging: 7.0, seafood: 8.0, udang: 8.0, sotong: 8.0 }, hasVariants: true },
+  ],
+  "Istimewa Nasi Goreng": [
+    { id: 'ng1', name: 'Nasi Goreng Fauziah', price: 10.0 },
+    { id: 'ng2', name: 'Nasi Goreng Special', price: 9.0 },
+    { id: 'ng3', name: 'Nasi Goreng U.S.A', price: 9.0 },
+    { id: 'ng4', name: 'Nasi Goreng Thailand', price: 9.0 },
+  ],
+  "Western Food": [
+    { id: 'w1', name: 'Chicken Chop', price: 14.0 },
+    { id: 'w2', name: 'Lamb Chop', price: 18.0 },
+    { id: 'w3', name: 'Beef Steak', price: 18.0 },
+    { id: 'w4', name: 'Fish & Chip', price: 11.0 },
+  ],
+  "Minuman": [
+    { id: 'd1', name: 'Teh O', prices: { panas: 1.5, sejuk: 2.0 }, isDrink: true },
+    { id: 'd2', name: 'Teh', prices: { panas: 2.0, sejuk: 2.5 }, isDrink: true },
+    { id: 'd3', name: 'Milo', prices: { panas: 2.5, sejuk: 3.0 }, isDrink: true },
+    { id: 'd4', name: 'Nescafe', prices: { panas: 2.5, sejuk: 3.0 }, isDrink: true },
+  ]
+};
+
+const VARIANT_TYPES = ['ayam', 'daging', 'perut', 'seafood', 'udang', 'sotong'];
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState('landing'); // landing, student, kitchen
+  const [orders, setOrders] = useState([]);
+
+  // Auth Initialization
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        await signInAnonymously(auth);
+      } catch (err) {
+        console.error("Auth failed", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  // Listen for Orders
+  useEffect(() => {
+    if (!user) return;
+    const ordersCol = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
+    const q = query(ordersCol);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort in JS: Newest first
+      setOrders(data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
+    }, (err) => console.error("Firestore error", err));
+    return () => unsubscribe();
+  }, [user]);
+
+  if (view === 'landing') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-red-600 text-white p-4 rounded-full mb-6">
+          <Utensils size={48} />
         </div>
-    </div>
-
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, doc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Configuration from environment
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fauziah-tomyam-001';
-
-        // State
-        let user = null;
-        let currentView = 'landing';
-        let orderType = '';
-        let activeTab = 'Masakan';
-        let cart = [];
-        let liveOrders = [];
-
-        // Menu Data
-        const menuData = {
-            "Masakan": [
-                { name: "Merah", types: ["Ayam", "Daging", "Perut", "Seafood", "Udang", "Sotong"], prices: [7, 7, 8, 8, 8, 8] },
-                { name: "Pedas", types: ["Ayam", "Daging", "Perut", "Seafood", "Udang", "Sotong"], prices: [7, 7, 8, 8, 8, 8] },
-                { name: "Paprik", types: ["Ayam", "Daging", "Perut", "Seafood", "Udang", "Sotong"], prices: [7, 7, 8, 8, 8, 8] },
-                { name: "Black Papper", types: ["Ayam", "Daging", "Perut", "Seafood", "Udang", "Sotong"], prices: [7, 7, 8, 8, 8, 8] }
-            ],
-            "Nasi Goreng": [
-                { name: "Fauziah", price: 10.0 }, { name: "Special", price: 9.0 },
-                { name: "U.S.A", price: 9.0 }, { name: "Thailand", price: 9.0 }
-            ],
-            "Minuman": [
-                { name: "Teh O", variants: ["Panas", "Sejuk"], prices: [1.5, 2.0] },
-                { name: "Teh", variants: ["Panas", "Sejuk"], prices: [2.0, 2.5] },
-                { name: "Milo", variants: ["Panas", "Sejuk"], prices: [2.5, 3.0] }
-            ],
-            "Western": [
-                { name: "Chicken Chop", price: 14.0 }, { name: "Lamb Chop", price: 18.0 }
-            ]
-        };
-
-        // --- AUTH & INITIALIZATION ---
-        async function init() {
-            try {
-                await signInAnonymously(auth);
-                onAuthStateChanged(auth, (u) => {
-                    user = u;
-                    if (user) startListening();
-                });
-            } catch (err) { console.error("Auth failed", err); }
-        }
-
-        function startListening() {
-            const q = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-            onSnapshot(q, (snapshot) => {
-                liveOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Sort by timestamp (newest first)
-                liveOrders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                render();
-            }, (err) => console.error("Listen error", err));
-        }
-
-        // --- ACTIONS ---
-        window.changeView = (view) => { currentView = view; render(); };
-        window.setOrderType = (type) => { orderType = type; currentView = 'menu'; render(); };
-        window.setActiveTab = (tab) => { activeTab = tab; render(); };
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Fauziah Tomyam</h1>
+        <p className="text-gray-600 mb-8 max-w-xs">Select your portal to continue the ordering process.</p>
         
-        window.addToCart = (name, price) => {
-            cart.push({ name, price });
-            render();
-        };
+        <div className="grid grid-cols-1 gap-4 w-full max-w-sm">
+          <button 
+            onClick={() => setView('student')}
+            className="flex items-center justify-between p-6 bg-white border-2 border-red-100 rounded-2xl hover:border-red-500 transition-all shadow-sm group"
+          >
+            <div className="flex items-center gap-4 text-left">
+              <div className="p-3 bg-red-50 text-red-600 rounded-xl group-hover:bg-red-600 group-hover:text-white transition-colors">
+                <Smartphone size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">Student Portal</h3>
+                <p className="text-sm text-gray-500">Scan QR to order</p>
+              </div>
+            </div>
+            <ChevronRight className="text-gray-300" />
+          </button>
 
-        window.checkout = async () => {
-            if (!user || cart.length === 0) return;
-            const orderObj = {
-                type: orderType,
-                items: cart,
-                status: 'Pending',
-                createdAt: serverTimestamp(),
-                total: cart.reduce((s, i) => s + i.price, 0)
-            };
-            try {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), orderObj);
-                cart = [];
-                currentView = 'landing';
-                alert("Order Sent to Kitchen!");
-                render();
-            } catch (e) { alert("Error sending order"); }
-        };
+          <button 
+            onClick={() => setView('kitchen')}
+            className="flex items-center justify-between p-6 bg-white border-2 border-blue-100 rounded-2xl hover:border-blue-500 transition-all shadow-sm group"
+          >
+            <div className="flex items-center gap-4 text-left">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <ChefHat size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">Kitchen Portal</h3>
+                <p className="text-sm text-gray-500">Manage incoming orders</p>
+              </div>
+            </div>
+            <ChevronRight className="text-gray-300" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-        window.markReady = async (id) => {
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', id);
-            await updateDoc(docRef, { status: 'Ready' });
-        };
+  return (
+    <div className="min-h-screen bg-white">
+      {view === 'student' ? (
+        <StudentApp orders={orders} onBack={() => setView('landing')} />
+      ) : (
+        <KitchenApp orders={orders} onBack={() => setView('landing')} />
+      )}
+    </div>
+  );
+}
 
-        window.removeOrder = async (id) => {
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', id);
-            await deleteDoc(docRef);
-        };
+// --- STUDENT PORTAL ---
+function StudentApp({ orders, onBack }) {
+  const [step, setStep] = useState('type'); // type, menu, cart, success
+  const [orderType, setOrderType] = useState(null); // dine-in, take-away
+  const [cart, setCart] = useState([]);
+  const [activeCategory, setActiveCategory] = useState("Masakan (Thai)");
+  const [isOrdering, setIsOrdering] = useState(false);
 
-        // --- UI RENDERING ---
-        function render() {
-            const app = document.getElementById('app');
-            
-            if (currentView === 'landing') {
-                app.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-screen p-8 text-center bg-red-600 text-white">
-                        <div class="mb-6 w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-xl">
-                            <i class="fas fa-utensils text-red-600 text-3xl"></i>
-                        </div>
-                        <h1 class="text-3xl font-black tracking-tighter mb-2">FAUZIAH TOMYAM</h1>
-                        <p class="opacity-80 text-sm mb-12">ORDER FROM YOUR TABLE</p>
-                        <div class="w-full space-y-4">
-                            <button onclick="setOrderType('Dine-In')" class="w-full py-4 bg-white text-red-600 rounded-2xl font-black shadow-xl active:scale-95 transition-transform">DINE-IN</button>
-                            <button onclick="setOrderType('Takeaway')" class="w-full py-4 border-2 border-white rounded-2xl font-black active:scale-95 transition-transform">TAKE AWAY</button>
-                        </div>
-                        <button onclick="changeView('kitchen')" class="mt-20 text-[10px] font-bold opacity-40 uppercase tracking-widest border-b border-white/30">Switch to Kitchen View</button>
-                    </div>
-                `;
-            } 
-            
-            else if (currentView === 'menu') {
-                app.innerHTML = `
-                    <div class="flex flex-col h-screen">
-                        <div class="p-4 bg-white border-b sticky top-0 z-10">
-                            <div class="flex justify-between items-center mb-4">
-                                <button onclick="changeView('landing')"><i class="fas fa-arrow-left text-red-600"></i></button>
-                                <span class="font-bold text-gray-800">${orderType} Menu</span>
-                                <div class="w-4"></div>
-                            </div>
-                            <div class="flex overflow-x-auto no-scrollbar space-x-6 text-xs font-black uppercase tracking-tighter">
-                                ${Object.keys(menuData).map(cat => `
-                                    <button onclick="setActiveTab('${cat}')" class="pb-2 whitespace-nowrap ${activeTab === cat ? 'active-tab' : 'text-gray-300'}">${cat}</button>
-                                `).join('')}
-                            </div>
-                        </div>
-                        <div class="flex-1 overflow-y-auto p-4 space-y-3 pb-32">
-                            ${menuData[activeTab].map(item => `
-                                <div class="bg-white p-4 rounded-2xl border shadow-sm border-gray-100">
-                                    <h3 class="font-bold text-gray-800">${item.name}</h3>
-                                    <div class="flex flex-wrap gap-2 mt-3">
-                                        ${item.price ? `
-                                            <button onclick="addToCart('${item.name}', ${item.price})" class="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-black border border-red-100">+ RM${item.price.toFixed(2)}</button>
-                                        ` : (item.types || item.variants).map((type, i) => `
-                                            <button onclick="addToCart('${item.name} (${type})', ${item.prices[i]})" class="bg-gray-50 text-gray-600 px-3 py-2 rounded-xl text-[10px] font-bold border">+ ${type} RM${item.prices[i].toFixed(2)}</button>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        ${cart.length > 0 ? `
-                            <div class="fixed bottom-0 max-w-md w-full bg-white p-4 border-t shadow-2xl flex justify-between items-center animate-bounce">
-                                <div><p class="text-xl font-black text-red-600">RM ${cart.reduce((s, i) => s + i.price, 0).toFixed(2)}</p></div>
-                                <button onclick="checkout()" class="bg-red-600 text-white px-10 py-3 rounded-2xl font-black shadow-lg">ORDER NOW</button>
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-            }
+  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-            else if (currentView === 'kitchen') {
-                app.innerHTML = `
-                    <div class="min-h-screen bg-gray-900 text-white p-6">
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-xl font-black text-red-500 tracking-tighter">LIVE ORDERS</h2>
-                            <button onclick="changeView('landing')" class="text-[10px] bg-gray-800 px-4 py-2 rounded-full font-bold">CLOSE</button>
-                        </div>
-                        <div class="space-y-4">
-                            ${liveOrders.length === 0 ? `<p class="text-center text-gray-600 py-20">No orders yet...</p>` : ''}
-                            ${liveOrders.map(o => `
-                                <div class="order-card bg-gray-800 p-5 rounded-3xl border-l-8 ${o.status === 'Ready' ? 'border-green-500' : 'border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.2)]'}">
-                                    <div class="flex justify-between items-start mb-4">
-                                        <div>
-                                            <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">${o.type}</span>
-                                            <p class="text-xs text-gray-400">Order ID: ...${o.id.slice(-4)}</p>
-                                        </div>
-                                        <span class="px-3 py-1 rounded-full text-[10px] font-black ${o.status === 'Ready' ? 'bg-green-600' : 'bg-red-600'}">${o.status}</span>
-                                    </div>
-                                    <div class="space-y-2 mb-6">
-                                        ${o.items.map(i => `<div class="flex justify-between text-sm font-medium"><span>• ${i.name}</span><span class="text-gray-500 italic">RM${i.price}</span></div>`).join('')}
-                                    </div>
-                                    <div class="pt-4 border-t border-white/5">
-                                        ${o.status === 'Pending' ? `
-                                            <button onclick="markReady('${o.id}')" class="w-full py-4 bg-green-600 rounded-2xl font-black text-xs uppercase tracking-widest">Mark as Ready</button>
-                                        ` : `
-                                            <button onclick="removeOrder('${o.id}')" class="w-full py-4 bg-blue-600 rounded-2xl font-black text-xs uppercase tracking-widest">Order Completed</button>
-                                        `}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-        }
+  const addToCart = (item, variant = null, temperature = null) => {
+    let price = item.price;
+    let name = item.name;
 
-        init();
-    </script>
-</body>
-</html>
+    if (variant) {
+      price = item.prices[variant];
+      name = `${item.name} (${variant})`;
+    } else if (temperature) {
+      price = item.prices[temperature];
+      name = `${item.name} (${temperature})`;
+    }
+
+    const cartId = `${item.id}-${variant || ''}-${temperature || ''}`;
+    
+    setCart(prev => {
+      const existing = prev.find(i => i.cartId === cartId);
+      if (existing) {
+        return prev.map(i => i.cartId === cartId ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, { cartId, name, price, quantity: 1 }];
+    });
+  };
+
+  const updateQuantity = (cartId, delta) => {
+    setCart(prev => prev.map(item => {
+      if (item.cartId === cartId) {
+        const newQty = Math.max(0, item.quantity + delta);
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    }).filter(item => item.quantity > 0));
+  };
+
+  const submitOrder = async () => {
+    if (cart.length === 0) return;
+    setIsOrdering(true);
+    try {
+      const orderData = {
+        items: cart,
+        total,
+        type: orderType,
+        status: 'pending',
+        timestamp: serverTimestamp(),
+        userId: auth.currentUser.uid,
+        customerName: `Student #${auth.currentUser.uid.slice(-4)}`
+      };
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), orderData);
+      setCart([]);
+      setStep('success');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsOrdering(false);
+    }
+  };
+
+  if (step === 'type') {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-screen animate-in fade-in zoom-in duration-300">
+        <h2 className="text-2xl font-bold mb-8">Welcome to Fauziah Tomyam</h2>
+        <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+          <button 
+            onClick={() => { setOrderType('dine-in'); setStep('menu'); }}
+            className="flex flex-col items-center p-6 bg-red-50 text-red-700 rounded-2xl border-2 border-transparent hover:border-red-500"
+          >
+            <Utensils size={40} className="mb-2" />
+            <span className="font-bold">Dine In</span>
+          </button>
+          <button 
+            onClick={() => { setOrderType('take-away'); setStep('menu'); }}
+            className="flex flex-col items-center p-6 bg-orange-50 text-orange-700 rounded-2xl border-2 border-transparent hover:border-orange-500"
+          >
+            <ShoppingBag size={40} className="mb-2" />
+            <span className="font-bold">Take Away</span>
+          </button>
+        </div>
+        <button onClick={onBack} className="mt-8 text-gray-400 text-sm underline">Back to Mode Selection</button>
+      </div>
+    );
+  }
+
+  if (step === 'success') {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-screen text-center">
+        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
+          <CheckCircle2 size={40} />
+        </div>
+        <h2 className="text-2xl font-bold mb-2">Order Placed!</h2>
+        <p className="text-gray-600 mb-8">The kitchen has received your order. We'll notify you when it's ready.</p>
+        <button 
+          onClick={() => setStep('menu')}
+          className="bg-red-600 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-red-200"
+        >
+          Order More
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-32">
+      {/* Header */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-10 px-4 py-4 border-b">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-red-600">Fauziah Tomyam</h1>
+          <div className="text-xs px-2 py-1 bg-gray-100 rounded-full uppercase font-bold tracking-wider text-gray-500">
+            {orderType}
+          </div>
+        </div>
+        
+        <div className="flex gap-2 overflow-x-auto no-scrollbar mt-4">
+          {Object.keys(MENU_DATA).map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                activeCategory === cat ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Menu Items */}
+      <div className="px-4 py-6 space-y-6">
+        {MENU_DATA[activeCategory].map(item => (
+          <div key={item.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-start gap-4">
+            <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400">
+              <Utensils size={24} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-900">{item.name}</h3>
+              {item.price && <p className="text-red-600 font-bold">RM {item.price.toFixed(2)}</p>}
+              
+              <div className="mt-3 flex flex-wrap gap-2">
+                {item.hasVariants ? (
+                  VARIANT_TYPES.map(v => (
+                    item.prices[v] && (
+                      <button 
+                        key={v}
+                        onClick={() => addToCart(item, v)}
+                        className="text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium capitalize"
+                      >
+                        + {v} (RM{item.prices[v]})
+                      </button>
+                    )
+                  ))
+                ) : item.isDrink ? (
+                  ['panas', 'sejuk'].map(t => (
+                    <button 
+                      key={t}
+                      onClick={() => addToCart(item, null, t)}
+                      className="text-xs px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-medium capitalize"
+                    >
+                      + {t} (RM{item.prices[t]})
+                    </button>
+                  ))
+                ) : (
+                  <button 
+                    onClick={() => addToCart(item)}
+                    className="text-xs px-4 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold"
+                  >
+                    Add to Cart
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Cart Summary (Floating) */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 shadow-2xl z-20">
+          <div className="max-w-md mx-auto">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <p className="text-sm text-gray-500">{cart.length} items added</p>
+                <p className="text-lg font-bold text-gray-900">Total: RM {total.toFixed(2)}</p>
+              </div>
+              <button 
+                onClick={() => setStep('cart')}
+                className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"
+              >
+                View Cart <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cart Modal */}
+      {step === 'cart' && (
+        <div className="fixed inset-0 bg-black/50 z-30 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">Your Order</h2>
+              <button onClick={() => setStep('menu')} className="p-2 bg-gray-100 rounded-full">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {cart.map(item => (
+                <div key={item.cartId} className="flex justify-between items-center py-2 border-b border-gray-50">
+                  <div className="flex-1">
+                    <h4 className="font-semibold">{item.name}</h4>
+                    <p className="text-sm text-red-600">RM {item.price.toFixed(2)}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => updateQuantity(item.cartId, -1)} className="p-1 bg-gray-100 rounded-lg"><Minus size={16} /></button>
+                    <span className="font-bold w-4 text-center">{item.quantity}</span>
+                    <button onClick={() => updateQuantity(item.cartId, 1)} className="p-1 bg-red-100 text-red-600 rounded-lg"><Plus size={16} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div className="flex justify-between text-lg font-bold">
+                <span>Total Amount</span>
+                <span>RM {total.toFixed(2)}</span>
+              </div>
+              <button 
+                disabled={isOrdering}
+                onClick={submitOrder}
+                className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-red-200 flex items-center justify-center gap-2"
+              >
+                {isOrdering ? "Processing..." : `Place Order (RM ${total.toFixed(2)})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- KITCHEN PORTAL ---
+function KitchenApp({ orders, onBack }) {
+  const stats = useMemo(() => {
+    return {
+      pending: orders.filter(o => o.status === 'pending').length,
+      preparing: orders.filter(o => o.status === 'preparing').length,
+      ready: orders.filter(o => o.status === 'ready').length
+    };
+  }, [orders]);
+
+  const updateStatus = async (orderId, newStatus) => {
+    try {
+      const orderRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId);
+      await updateDoc(orderRef, { status: newStatus });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <div className="h-screen flex flex-col bg-slate-50">
+      {/* Kitchen Header */}
+      <header className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-600 text-white rounded-lg">
+            <ChefHat size={24} />
+          </div>
+          <h1 className="text-xl font-bold">Kitchen Dashboard</h1>
+        </div>
+        <div className="flex gap-4 items-center">
+          <div className="flex gap-2">
+            <Badge color="bg-orange-100 text-orange-700" label={`${stats.pending} New`} />
+            <Badge color="bg-blue-100 text-blue-700" label={`${stats.preparing} Cooking`} />
+          </div>
+          <button onClick={onBack} className="text-sm font-medium text-gray-500 hover:text-gray-900">Switch View</button>
+        </div>
+      </header>
+
+      {/* Order Grid */}
+      <main className="flex-1 p-6 overflow-hidden flex gap-6">
+        {/* Column: New Orders */}
+        <section className="flex-1 flex flex-col min-w-[300px]">
+          <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Clock size={16} /> New Orders
+          </h2>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+            {orders.filter(o => o.status === 'pending').map(order => (
+              <OrderCard key={order.id} order={order} onAction={() => updateStatus(order.id, 'preparing')} actionLabel="Start Cooking" />
+            ))}
+          </div>
+        </section>
+
+        {/* Column: Preparing */}
+        <section className="flex-1 flex flex-col min-w-[300px]">
+          <h2 className="text-sm font-bold text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Utensils size={16} /> Preparing
+          </h2>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+            {orders.filter(o => o.status === 'preparing').map(order => (
+              <OrderCard key={order.id} order={order} variant="blue" onAction={() => updateStatus(order.id, 'ready')} actionLabel="Mark Ready" />
+            ))}
+          </div>
+        </section>
+
+        {/* Column: Ready for Pickup */}
+        <section className="flex-1 flex flex-col min-w-[300px]">
+          <h2 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <CheckCircle2 size={16} /> Ready / Picked up
+          </h2>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2 opacity-60">
+            {orders.filter(o => o.status === 'ready').map(order => (
+              <OrderCard key={order.id} order={order} variant="green" onAction={() => updateStatus(order.id, 'completed')} actionLabel="Clear Order" />
+            ))}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+// --- HELPER COMPONENTS ---
+
+function Badge({ color, label }) {
+  return <span className={`${color} px-3 py-1 rounded-full text-xs font-bold`}>{label}</span>;
+}
+
+function OrderCard({ order, onAction, actionLabel, variant = 'gray' }) {
+  const colors = {
+    gray: 'border-l-orange-500',
+    blue: 'border-l-blue-500 bg-blue-50/30',
+    green: 'border-l-green-500'
+  };
+
+  const actionColors = {
+    gray: 'bg-orange-600 hover:bg-orange-700',
+    blue: 'bg-blue-600 hover:bg-blue-700',
+    green: 'bg-green-600 hover:bg-green-700'
+  };
+
+  return (
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 ${colors[variant]} p-4 flex flex-col`}>
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <h4 className="font-bold text-gray-900">{order.customerName}</h4>
+          <p className="text-xs text-gray-500 uppercase">{order.type} • {new Date(order.timestamp?.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+        </div>
+        <span className="text-sm font-mono font-bold text-gray-400">#{order.id.slice(-4)}</span>
+      </div>
+      
+      <div className="space-y-1 mb-4 flex-1">
+        {order.items.map((item, idx) => (
+          <div key={idx} className="flex justify-between text-sm">
+            <span className="text-gray-700"><span className="font-bold text-gray-900">{item.quantity}x</span> {item.name}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-3 border-t border-gray-50 flex items-center justify-between">
+        <span className="text-sm font-bold text-gray-900">RM {order.total.toFixed(2)}</span>
+        <button 
+          onClick={onAction}
+          className={`${actionColors[variant]} text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors`}
+        >
+          {actionLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 ```
