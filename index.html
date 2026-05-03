@@ -3,24 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fauziah Tomyam - QR Ordering</title>
+    <title>Fauziah Tomyam - Order System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        // CONFIGURATION SECTION
-        // If hosting on GitHub, replace the {} below with your Firebase Config from Firebase Console
-        const manualConfig = {}; 
-        
-        const firebaseConfig = (window.__firebase_config) ? JSON.parse(window.__firebase_config) : manualConfig;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fauziah-tomyam-system';
-        
+        // Your actual Firebase keys
+        const firebaseConfig = {
+            apiKey: "AIzaSyB3cTUo_fXgAOr-FBItpCe2v8sgzK5DxC8",
+            authDomain: "fauziah-tomyam.firebaseapp.com",
+            projectId: "fauziah-tomyam",
+            storageBucket: "fauziah-tomyam.firebasestorage.app",
+            messagingSenderId: "745755449131",
+            appId: "1:745755449131:web:a9dffb9944f1019965d76e"
+        }; 
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
+        const appId = 'fauziah-tomyam-system';
 
         window.FauziahApp = {
             view: 'landing', 
@@ -29,51 +33,108 @@
             cart: [],
             orders: [],
             user: null,
+            authError: null,
 
             menu: {
                 "MINUMAN": [
-                    { name: "Teh O", price: 1.50, options: ["Panas", "Sejuk"], prices: [1.50, 2.00] },
-                    { name: "Teh", price: 2.00, options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
-                    { name: "Milo", price: 2.50, options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
-                    { name: "Nescafe", price: 2.50, options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
-                    { name: "Sirap", price: 1.50, options: ["Sejuk"], prices: [2.00] }
+                    { name: "Teh O", options: ["Panas", "Sejuk"], prices: [1.50, 2.00] },
+                    { name: "Teh", options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
+                    { name: "Teh Halia", options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
+                    { name: "Kopi O", options: ["Panas", "Sejuk"], prices: [1.50, 2.00] },
+                    { name: "Kopi", options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
+                    { name: "Milo O", options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
+                    { name: "Milo", options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
+                    { name: "Nescafe O", options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
+                    { name: "Nescafe", options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
+                    { name: "Neslo", options: ["Panas", "Sejuk"], prices: [3.00, 3.50] },
+                    { name: "Horlick O", options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
+                    { name: "Horlick", options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
+                    { name: "Sirap", options: ["Panas", "Sejuk"], prices: [1.50, 2.00] },
+                    { name: "Sirap Bandung", options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
+                    { name: "Sirap Limau", options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
+                    { name: "Barli", options: ["Panas", "Sejuk"], prices: [2.00, 2.00] },
+                    { name: "Laicikang", options: ["Panas", "Sejuk"], prices: [4.00, 4.00] },
+                    { name: "Kopi Jantan", options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
+                    { name: "Radix", options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
+                    { name: "Extra Joss", options: ["Sejuk"], prices: [2.50] },
+                    { name: "Teh Hijau", options: ["Panas", "Sejuk"], prices: [2.50, 3.00] },
+                    { name: "Sirap Hijau", options: ["Sejuk"], prices: [2.00] }
+                ],
+                "BUAH-BUAHAN": [
+                    { name: "Limau", options: ["Panas", "Sejuk"], prices: [1.50, 2.00] },
+                    { name: "Orange Sunquick", options: ["Panas", "Sejuk"], prices: [2.00, 2.50] },
+                    { name: "Fresh Orange", options: ["Panas", "Sejuk"], prices: [3.50, 3.50] },
+                    { name: "Apple", options: ["Panas", "Sejuk"], prices: [3.50, 3.50] },
+                    { name: "Nanas", options: ["Panas", "Sejuk"], prices: [3.50, 3.50] },
+                    { name: "Tembikai", options: ["Panas", "Sejuk"], prices: [3.50, 3.50] },
+                    { name: "Carrot", options: ["Panas", "Sejuk"], prices: [3.50, 3.50] },
+                    { name: "Laici", options: ["Panas", "Sejuk"], prices: [3.50, 3.50] },
+                    { name: "Tembikai Laici", options: ["Panas", "Sejuk"], prices: [5.00, 5.00] },
+                    { name: "Longan", options: ["Panas", "Sejuk"], prices: [3.50, 3.50] }
+                ],
+                "MASAKAN (PILIH LAUK)": [
+                    { name: "Masak Merah", proteins: ["Ayam/Daging/Perut", "Seafood/Udang/Sotong"], prices: [7.00, 8.00] },
+                    { name: "Masak Pedas", proteins: ["Ayam/Daging/Perut", "Seafood/Udang/Sotong"], prices: [7.00, 8.00] },
+                    { name: "Masak Paprik", proteins: ["Ayam/Daging/Perut", "Seafood/Udang/Sotong"], prices: [7.00, 8.00] },
+                    { name: "Masak Black Pepper", proteins: ["Ayam/Daging/Perut", "Seafood/Udang/Sotong"], prices: [7.00, 8.00] },
+                    { name: "Masak Halia", proteins: ["Ayam/Daging/Perut", "Seafood/Udang/Sotong"], prices: [7.00, 8.00] },
+                    { name: "Masak Kicap", proteins: ["Ayam/Daging/Perut", "Seafood/Udang/Sotong"], prices: [7.00, 8.00] },
+                    { name: "Masak Goreng", proteins: ["Ayam/Daging/Perut", "Seafood/Udang/Sotong"], prices: [7.00, 8.00] },
+                    { name: "Masak Kerabu", proteins: ["Ayam/Daging/Perut", "Seafood/Udang/Sotong"], prices: [7.00, 8.00] }
                 ],
                 "NASI GORENG": [
                     { name: "Nasi Goreng Fauziah", price: 10.00 },
                     { name: "Nasi Goreng Special", price: 9.00 },
                     { name: "Nasi Goreng U.S.A", price: 9.00 },
                     { name: "Nasi Goreng Thailand", price: 9.00 },
+                    { name: "Nasi Goreng Hatan Special", price: 9.00 },
                     { name: "Nasi Goreng Petai", price: 10.00 }
                 ],
-                "WESTERN": [
+                "GORENG TEPUNG": [
+                    { name: "Udang Goreng Tepung", price: 8.00 },
+                    { name: "Sotong Goreng Tepung", price: 8.00 },
+                    { name: "Puyuh Goreng Tepung", price: 8.00 },
+                    { name: "Sayur Goreng Tepung", price: 5.00 },
+                    { name: "Cendawan Goreng Tepung", price: 6.00 }
+                ],
+                "WESTERN FOOD": [
                     { name: "Chicken Chop", price: 14.00 },
                     { name: "Lamb Chop", price: 18.00 },
                     { name: "Beef Steak", price: 18.00 },
-                    { name: "Fish & Chip", price: 11.00 }
-                ],
-                "MASAKAN": [
-                    { name: "Nasi + Tomyam Ayam", price: 8.00 },
-                    { name: "Nasi + Paprik Daging", price: 9.00 },
-                    { name: "Nasi + Daging Merah", price: 9.00 }
+                    { name: "Fish & Chip", price: 11.00 },
+                    { name: "Chicken Wing", price: 7.00 },
+                    { name: "French Fries", price: 5.00 },
+                    { name: "Mushroom Soup", price: 5.00 }
                 ]
             },
 
             async init() {
-                const initAuth = async () => {
-                    if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-                        await signInWithCustomToken(auth, window.__initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                };
-
                 onAuthStateChanged(auth, (user) => {
                     this.user = user;
+                    this.authError = null;
                     if (user) { this.loadOrders(); }
                     this.render();
                 });
-
-                try { await initAuth(); } catch (err) { console.error("Auth failed", err); }
+                
+                const trySignIn = async (retries = 5, delay = 1000) => {
+                    try {
+                        await signInAnonymously(auth);
+                    } catch (err) {
+                        if (err.code === 'auth/configuration-not-found') {
+                            this.authError = "Anonymous Auth is NOT enabled in Firebase Console. Please go to Build > Authentication > Settings and enable it.";
+                            this.render();
+                            return;
+                        }
+                        if (retries > 0) {
+                            setTimeout(() => trySignIn(retries - 1, delay * 2), delay);
+                        } else {
+                            console.error("Auth failed after retries", err);
+                            this.authError = "Failed to connect to system. Please check your internet.";
+                            this.render();
+                        }
+                    }
+                };
+                await trySignIn();
             },
 
             loadOrders() {
@@ -82,7 +143,7 @@
                 onSnapshot(ordersRef, (snapshot) => {
                     this.orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     this.render();
-                }, (err) => console.error("Firestore Listen Error:", err));
+                }, (err) => console.error("Firestore error:", err));
             },
 
             setView(newView) {
@@ -95,8 +156,7 @@
                 const element = document.getElementById('cat-' + catId.replace(/\s+/g, '-'));
                 if (element) {
                     const offset = 140; 
-                    const elementPosition = element.getBoundingClientRect().top;
-                    const offsetPosition = elementPosition + window.pageYOffset - offset;
+                    const offsetPosition = element.getBoundingClientRect().top + window.pageYOffset - offset;
                     window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
                 }
             },
@@ -104,18 +164,23 @@
             startOrder(type) {
                 this.orderType = type;
                 if (type === 'Dine In') {
-                    const num = prompt("Enter Table Number:");
+                    const num = prompt("Nombor Meja (Table Number):");
                     this.tableNumber = num || "N/A";
                 }
                 this.setView('menu');
             },
 
             addToCart(item, optionIndex = -1) {
-                let price = item.price;
+                let price = item.price || 0;
                 let label = item.name;
-                if (optionIndex !== -1 && item.options) {
-                    price = item.prices[optionIndex];
-                    label = `${item.name} (${item.options[optionIndex]})`;
+                if (optionIndex !== -1) {
+                    if (item.options) {
+                        price = item.prices[optionIndex];
+                        label = `${item.name} (${item.options[optionIndex]})`;
+                    } else if (item.proteins) {
+                        price = item.prices[optionIndex];
+                        label = `${item.name} (${item.proteins[optionIndex]})`;
+                    }
                 }
                 this.cart.push({ displayTitle: label, selectedPrice: price, id: Date.now() + Math.random() });
                 this.render();
@@ -138,7 +203,6 @@
                     btn.disabled = true;
                     btn.innerHTML = '<span class="animate-spin mr-2">⏳</span> SENDING...';
                 }
-
                 const orderData = {
                     items: [...this.cart],
                     total: this.getCartTotal(),
@@ -148,18 +212,15 @@
                     timestamp: Date.now(),
                     userId: this.user.uid
                 };
-
                 try {
                     const ordersRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
                     await addDoc(ordersRef, orderData);
                     this.cart = [];
                     this.setView('status');
                 } catch (e) {
-                    console.error("Error sending order:", e);
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerText = 'CONFIRM ORDER';
-                    }
+                    console.error("Order Error:", e);
+                    if (btn) { btn.disabled = false; btn.innerText = 'CONFIRM ORDER'; }
+                    this.showToast("Order failed. Enable Firestore in Console!");
                 }
             },
 
@@ -182,12 +243,30 @@
             render() {
                 const appRoot = document.getElementById('app');
                 if (!appRoot) return;
-                
+
+                if (this.authError) {
+                    appRoot.innerHTML = `
+                        <div class="max-w-md mx-auto p-10 mt-20 bg-white shadow-xl rounded-3xl text-center">
+                            <div class="text-red-500 mb-4 font-black">SYSTEM ERROR</div>
+                            <p class="text-sm text-gray-600 mb-6">${this.authError}</p>
+                            <div class="text-left text-[11px] bg-gray-50 p-4 rounded-xl space-y-2">
+                                <p><strong>How to fix:</strong></p>
+                                <p>1. Go to Firebase Console</p>
+                                <p>2. Click <strong>Build > Authentication</strong></p>
+                                <p>3. Go to <strong>Sign-in method</strong> tab</p>
+                                <p>4. Click <strong>Add new provider</strong></p>
+                                <p>5. Select <strong>Anonymous</strong> and click <strong>Enable</strong></p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
                 let html = `
                     <div class="max-w-md mx-auto bg-gray-50 min-h-screen flex flex-col relative">
                         <header class="bg-red-700 text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-lg">
                             <div onclick="FauziahApp.setView('landing')" class="cursor-pointer">
-                                <h1 class="text-xl font-black italic tracking-tighter">FAUZIAH <span class="text-yellow-400">TOMYAM</span></h1>
+                                <h1 class="text-xl font-black italic tracking-tighter uppercase">FAUZIAH <span class="text-yellow-400">TOMYAM</span></h1>
                             </div>
                             <button onclick="FauziahApp.setView('kitchen')" class="bg-white/20 p-2 rounded-lg"><i data-lucide="chef-hat" class="w-5 h-5"></i></button>
                         </header>
@@ -199,12 +278,12 @@
                         <div class="p-8 text-center pt-20">
                             <div class="mb-12">
                                 <div class="bg-red-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"><i data-lucide="qr-code" class="text-red-600 w-12 h-12"></i></div>
-                                <h2 class="text-3xl font-black text-gray-900">ORDER NOW</h2>
-                                <p class="text-gray-500 font-medium">Welcome to Student QR System</p>
+                                <h2 class="text-3xl font-black text-gray-900 uppercase">Order Now</h2>
+                                <p class="text-gray-500 font-medium">Sila pilih cara pesanan anda</p>
                             </div>
                             <div class="space-y-4">
-                                <button onclick="FauziahApp.startOrder('Dine In')" class="w-full bg-red-600 text-white font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-3 transition">DINE IN</button>
-                                <button onclick="FauziahApp.startOrder('Take Away')" class="w-full bg-white border-2 border-red-600 text-red-600 font-black py-5 rounded-2xl flex items-center justify-center gap-3 transition">TAKE AWAY</button>
+                                <button onclick="FauziahApp.startOrder('Dine In')" class="w-full bg-red-600 text-white font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition">DINE IN (MAKAN SINI)</button>
+                                <button onclick="FauziahApp.startOrder('Take Away')" class="w-full bg-white border-2 border-red-600 text-red-600 font-black py-5 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition">TAKE AWAY (BUNGKUS)</button>
                             </div>
                         </div>
                     `;
@@ -212,7 +291,7 @@
                     html += `
                         <div class="sticky top-[64px] bg-white border-b z-40 p-3 overflow-x-auto no-scrollbar flex gap-2">
                             ${Object.keys(this.menu).map(cat => `
-                                <button onclick="FauziahApp.scrollToCategory('${cat}')" class="whitespace-nowrap px-4 py-2 bg-gray-100 rounded-full text-xs font-black text-gray-700 uppercase">
+                                <button onclick="FauziahApp.scrollToCategory('${cat}')" class="whitespace-nowrap px-4 py-2 bg-gray-100 rounded-full text-[10px] font-black text-gray-700 uppercase">
                                     ${cat}
                                 </button>
                             `).join('')}
@@ -220,25 +299,38 @@
                         <div class="p-4">
                             ${Object.entries(this.menu).map(([category, items]) => `
                                 <div id="cat-${category.replace(/\s+/g, '-')}" class="mb-8 pt-4">
-                                    <h3 class="text-lg font-black text-red-700 mb-4 border-l-4 border-red-700 pl-3 uppercase tracking-wider">${category}</h3>
+                                    <h3 class="text-xs font-black text-red-700 mb-4 border-l-4 border-red-700 pl-3 uppercase tracking-widest">${category}</h3>
                                     <div class="space-y-3">
                                         ${items.map(item => `
-                                            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
-                                                <div class="flex-1">
-                                                    <h4 class="font-bold text-gray-800 uppercase text-xs">${item.name}</h4>
-                                                    <p class="text-red-600 font-black">RM ${item.price.toFixed(2)}</p>
-                                                    ${item.options ? `
-                                                        <div class="flex gap-2 mt-2">
-                                                            ${item.options.map((opt, idx) => `
-                                                                <button onclick="FauziahApp.addToCart(${JSON.stringify(item).replace(/"/g, '&quot;')}, ${idx})" class="text-[10px] bg-gray-50 border px-2 py-1 rounded font-bold uppercase">${opt}</button>
-                                                            `).join('')}
-                                                        </div>
+                                            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                                                <div class="flex justify-between items-center">
+                                                    <div class="flex-1">
+                                                        <h4 class="font-bold text-gray-800 uppercase text-[11px]">${item.name}</h4>
+                                                        <p class="text-red-600 font-black text-xs">${item.price ? 'RM '+item.price.toFixed(2) : 'Sila Pilih'}</p>
+                                                    </div>
+                                                    ${!item.options && !item.proteins ? `
+                                                        <button onclick="FauziahApp.addToCart(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="bg-red-600 text-white p-2.5 rounded-xl active:scale-90 transition">
+                                                            <i data-lucide="plus" class="w-5 h-5"></i>
+                                                        </button>
                                                     ` : ''}
                                                 </div>
-                                                ${!item.options ? `
-                                                    <button onclick="FauziahApp.addToCart(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="bg-red-600 text-white p-2 rounded-xl shadow-md active:scale-90 transition-transform">
-                                                        <i data-lucide="plus" class="w-5 h-5"></i>
-                                                    </button>
+                                                ${item.options ? `
+                                                    <div class="flex flex-wrap gap-2 mt-3">
+                                                        ${item.options.map((opt, idx) => `
+                                                            <button onclick="FauziahApp.addToCart(${JSON.stringify(item).replace(/"/g, '&quot;')}, ${idx})" class="text-[9px] bg-gray-50 border px-3 py-2 rounded-lg font-black uppercase text-gray-600 active:bg-gray-200">
+                                                                ${opt} (RM ${item.prices[idx].toFixed(2)})
+                                                            </button>
+                                                        `).join('')}
+                                                    </div>
+                                                ` : ''}
+                                                ${item.proteins ? `
+                                                    <div class="flex flex-wrap gap-2 mt-3">
+                                                        ${item.proteins.map((pro, idx) => `
+                                                            <button onclick="FauziahApp.addToCart(${JSON.stringify(item).replace(/"/g, '&quot;')}, ${idx})" class="text-[9px] bg-gray-100 border px-3 py-2 rounded-lg font-black uppercase text-gray-700 active:bg-gray-200">
+                                                                + ${pro} (RM ${item.prices[idx].toFixed(2)})
+                                                            </button>
+                                                        `).join('')}
+                                                    </div>
                                                 ` : ''}
                                             </div>
                                         `).join('')}
@@ -250,15 +342,12 @@
                 } else if (this.view === 'cart') {
                     html += `
                         <div class="p-6">
-                            <h2 class="text-2xl font-black mb-6">Confirm Selection</h2>
-                            <div class="bg-yellow-50 p-3 rounded-xl border border-yellow-200 mb-6 text-xs font-bold text-yellow-800 uppercase text-center">
-                                Paying at Counter: ${this.orderType} ${this.tableNumber && this.tableNumber !== 'N/A' ? `(Table ${this.tableNumber})` : ''}
-                            </div>
-                            ${this.cart.length === 0 ? `<div class="text-center py-20 text-gray-400 font-bold uppercase">Basket is empty</div>` : `
+                            <h2 class="text-2xl font-black mb-6 uppercase">My Basket</h2>
+                            ${this.cart.length === 0 ? `<div class="text-center py-20 text-gray-400 font-bold uppercase text-xs">Basket empty</div>` : `
                                 <div class="space-y-3 mb-8">
                                     ${this.cart.map((item, index) => `
                                         <div class="bg-white p-4 rounded-xl flex justify-between items-center shadow-sm border border-gray-100">
-                                            <div><p class="font-bold text-gray-800 text-xs uppercase">${item.displayTitle}</p><p class="text-xs font-black text-red-600">RM ${item.selectedPrice.toFixed(2)}</p></div>
+                                            <div><p class="font-bold text-gray-800 text-[11px] uppercase">${item.displayTitle}</p><p class="text-xs font-black text-red-600">RM ${item.selectedPrice.toFixed(2)}</p></div>
                                             <button onclick="FauziahApp.removeFromCart(${index})" class="text-gray-300"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
                                         </div>
                                     `).join('')}
@@ -266,7 +355,7 @@
                                 <div class="border-t-2 border-dashed pt-4 mb-6">
                                     <div class="flex justify-between items-center font-black text-xl"><span>TOTAL</span><span class="text-red-700">RM ${this.getCartTotal()}</span></div>
                                 </div>
-                                <button id="confirm-btn" onclick="FauziahApp.confirmOrder()" class="w-full bg-red-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl uppercase active:scale-95 transition">CONFIRM ORDER</button>
+                                <button id="confirm-btn" onclick="FauziahApp.confirmOrder()" class="w-full bg-red-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl uppercase active:scale-95 transition">HANTAR PESANAN (SEND)</button>
                             `}
                         </div>
                     `;
@@ -274,37 +363,36 @@
                     const myOrders = this.orders.filter(o => o.userId === this.user?.uid).sort((a,b) => b.timestamp - a.timestamp);
                     html += `
                         <div class="p-6">
-                            <h2 class="text-2xl font-black mb-6">ORDER STATUS</h2>
+                            <h2 class="text-2xl font-black mb-6 uppercase">Order Status</h2>
                             <div class="space-y-4">
-                                ${myOrders.length === 0 ? '<p class="text-center py-10 text-gray-400 font-bold uppercase text-xs">No orders yet</p>' : ''}
+                                ${myOrders.length === 0 ? '<p class="text-center py-10 text-gray-400 font-bold uppercase text-xs">No active orders</p>' : ''}
                                 ${myOrders.map(order => `
                                     <div class="bg-white p-5 rounded-3xl border-2 shadow-sm ${order.status === 'Ready' ? 'border-green-500' : 'border-gray-100'}">
                                         <div class="flex justify-between items-start mb-4">
-                                            <span class="font-black text-red-700">#${order.id.slice(-4).toUpperCase()}</span>
-                                            <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-black uppercase">${order.status}</span>
+                                            <span class="font-black text-red-700 text-xs">#${order.id.slice(-4).toUpperCase()}</span>
+                                            <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-[9px] font-black uppercase">${order.status}</span>
                                         </div>
-                                        <div class="text-[10px] font-bold text-gray-400 mb-4">${order.items.map(i => i.displayTitle).join(', ')}</div>
-                                        <div class="bg-gray-50 p-3 rounded-xl text-center text-[10px] font-black uppercase text-gray-400">Pay RM ${order.total} at counter</div>
+                                        <div class="text-[10px] font-bold text-gray-400 mb-4 uppercase leading-relaxed">${order.items.map(i => i.displayTitle).join(', ')}</div>
+                                        <div class="bg-gray-50 p-3 rounded-xl text-center text-[10px] font-black uppercase text-gray-400 tracking-tighter">Sila Bayar RM ${order.total} di kaunter</div>
                                     </div>
                                 `).join('')}
                             </div>
-                            <button onclick="FauziahApp.setView('menu')" class="w-full mt-10 text-red-600 font-black uppercase text-xs text-center">Order More</button>
                         </div>
                     `;
                 } else if (this.view === 'kitchen') {
                     const activeOrders = this.orders.filter(o => o.status !== 'Completed').sort((a,b) => a.timestamp - b.timestamp);
                     html += `
-                        <div class="p-6 bg-gray-100 min-h-screen">
-                            <div class="flex justify-between items-center mb-8"><h2 class="text-2xl font-black text-red-700">KITCHEN OPS</h2><button onclick="FauziahApp.setView('landing')" class="text-xs font-black text-gray-400 uppercase">Exit</button></div>
+                        <div class="p-6">
+                            <div class="flex justify-between items-center mb-8"><h2 class="text-xl font-black text-red-700 uppercase">Dapur (Kitchen)</h2><button onclick="FauziahApp.setView('landing')" class="text-[10px] font-black uppercase text-gray-300">Exit</button></div>
                             <div class="space-y-4">
                                 ${activeOrders.map(order => `
-                                    <div class="bg-white p-6 rounded-3xl shadow-md">
-                                        <div class="flex justify-between border-b pb-4 mb-4"><h3 class="font-black text-xl">#${order.id.slice(-4).toUpperCase()} (T: ${order.table})</h3><span class="text-xs font-black text-red-600 uppercase">RM ${order.total}</span></div>
-                                        <div class="space-y-2 mb-6">${order.items.map(item => `<p class="font-bold text-gray-700 uppercase text-sm">1x ${item.displayTitle}</p>`).join('')}</div>
+                                    <div class="bg-white p-6 rounded-3xl shadow-md border-t-4 border-red-600">
+                                        <div class="flex justify-between mb-4"><h3 class="font-black text-lg">#${order.id.slice(-4).toUpperCase()} (${order.table})</h3><span class="text-xs font-black text-red-600">RM ${order.total}</span></div>
+                                        <div class="space-y-2 mb-6">${order.items.map(item => `<p class="font-bold text-gray-700 uppercase text-[11px]">1x ${item.displayTitle}</p>`).join('')}</div>
                                         <div class="flex gap-2">
-                                            ${order.status === 'Pending' ? `<button onclick="FauziahApp.updateOrderStatus('${order.id}', 'Preparing')" class="flex-1 bg-black text-white py-3 rounded-2xl font-black text-xs uppercase">PREPARE</button>` 
-                                            : order.status === 'Preparing' ? `<button onclick="FauziahApp.updateOrderStatus('${order.id}', 'Ready')" class="flex-1 bg-green-600 text-white py-3 rounded-2xl font-black text-xs uppercase">READY</button>` 
-                                            : `<button onclick="FauziahApp.updateOrderStatus('${order.id}', 'Completed')" class="flex-1 bg-gray-200 text-gray-500 py-3 rounded-2xl font-black text-xs uppercase">COMPLETE</button>`}
+                                            ${order.status === 'Pending' ? `<button onclick="FauziahApp.updateOrderStatus('${order.id}', 'Preparing')" class="flex-1 bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase">START</button>` 
+                                            : order.status === 'Preparing' ? `<button onclick="FauziahApp.updateOrderStatus('${order.id}', 'Ready')" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-black text-[10px] uppercase">READY</button>` 
+                                            : `<button onclick="FauziahApp.updateOrderStatus('${order.id}', 'Completed')" class="flex-1 bg-gray-200 text-gray-500 py-3 rounded-xl font-black text-[10px] uppercase">COMPLETE</button>`}
                                         </div>
                                     </div>
                                 `).join('')}
@@ -317,7 +405,7 @@
                     html += `</main>
                         <nav class="fixed bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white border shadow-2xl rounded-3xl py-4 flex justify-around z-50">
                             <button onclick="FauziahApp.setView('menu')" class="flex flex-col items-center ${this.view === 'menu' ? 'text-red-600' : 'text-gray-300'}"><i data-lucide="book-open" class="w-5 h-5"></i><span class="text-[8px] font-black uppercase">Menu</span></button>
-                            <button onclick="FauziahApp.setView('cart')" class="relative flex flex-col items-center ${this.view === 'cart' ? 'text-red-600' : 'text-gray-300'}"><i data-lucide="shopping-basket" class="w-5 h-5"></i><span class="text-[8px] font-black uppercase">Basket</span>${this.cart.length > 0 ? `<span class="absolute -top-2 -right-2 bg-red-600 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-bold">${this.cart.length}</span>` : ''}</button>
+                            <button onclick="FauziahApp.setView('cart')" class="relative flex flex-col items-center ${this.view === 'cart' ? 'text-red-600' : 'text-gray-300'}"><i data-lucide="shopping-basket" class="w-5 h-5"></i><span class="text-[8px] font-black uppercase">Cart</span>${this.cart.length > 0 ? `<span class="absolute -top-2 -right-2 bg-red-600 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-bold">${this.cart.length}</span>` : ''}</button>
                             <button onclick="FauziahApp.setView('status')" class="flex flex-col items-center ${this.view === 'status' ? 'text-red-600' : 'text-gray-300'}"><i data-lucide="clock" class="w-5 h-5"></i><span class="text-[8px] font-black uppercase">Status</span></button>
                         </nav>`;
                 } else { html += `</main>`; }
